@@ -267,8 +267,8 @@ void EGL::EglThread() {
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 15.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 10.0f);
-        // 滚动条宽度12px，更容易触摸
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 12.0f);
+        // 滚动条宽度30px，更容易触摸
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 30.0f);
 
         ImGui::PushStyleColor(ImGuiCol_TitleBg, themeColor);
         ImGui::PushStyleColor(ImGuiCol_TitleBgActive, themeColor);
@@ -322,10 +322,13 @@ void EGL::EglThread() {
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 1.0f));
             }
+            // 使用PushStyleVar让按钮文本居中
+            ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
             if (ImGui::Button(tabs[i], ImVec2(tabWidth, tabHeight))) {
                 selectedTab = i;
                 selectedModule = -1;
             }
+            ImGui::PopStyleVar(1);
             ImGui::PopStyleColor(1);
         }
         ImGui::Spacing();
@@ -340,9 +343,11 @@ void EGL::EglThread() {
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 1.0f));
             }
+            ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
             if (ImGui::Button("KillAura", ImVec2(leftPanelWidth - 25.0f, 40.0f))) {
                 selectedModule = 0;
             }
+            ImGui::PopStyleVar(1);
             ImGui::PopStyleColor(1);
         }
         else if (selectedTab == 1) {
@@ -352,9 +357,11 @@ void EGL::EglThread() {
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 1.0f));
             }
+            ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
             if (ImGui::Button("Speed", ImVec2(leftPanelWidth - 25.0f, 40.0f))) {
                 selectedModule = 0;
             }
+            ImGui::PopStyleVar(1);
             ImGui::PopStyleColor(1);
         }
         else if (selectedTab == 2) {
@@ -370,9 +377,11 @@ void EGL::EglThread() {
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 1.0f));
             }
+            ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
             if (ImGui::Button("Interface", ImVec2(leftPanelWidth - 25.0f, 40.0f))) {
                 selectedModule = 0;
             }
+            ImGui::PopStyleVar(1);
             ImGui::PopStyleColor(1);
         }
 
@@ -389,35 +398,35 @@ void EGL::EglThread() {
             ImGui::Spacing();
 
             ImGui::Text("Enabled");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             AppleToggle("##killaura_enabled", &killAuraEnabled, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Range");
-            ImGui::SameLine(rightPanelWidth - 60);
+            ImGui::SameLine(rightPanelWidth - 80);
             ImGui::Text("%.1f", killAuraRange);
             ThinSliderFloat("##ka_range", &killAuraRange, 1.0f, 6.0f, 4.0f, 35.0f);
             ImGui::Spacing();
 
             ImGui::Text("CPS");
-            ImGui::SameLine(rightPanelWidth - 50);
+            ImGui::SameLine(rightPanelWidth - 70);
             ImGui::Text("%d", killAuraCPS);
             ThinSliderInt("##ka_cps", &killAuraCPS, 1, 20, 4.0f, 35.0f);
             ImGui::Spacing();
 
             ImGui::Text("FOV");
-            ImGui::SameLine(rightPanelWidth - 60);
+            ImGui::SameLine(rightPanelWidth - 80);
             ImGui::Text("%.0f", killAuraFOV);
             ThinSliderFloat("##ka_fov", &killAuraFOV, 30.0f, 360.0f, 4.0f, 35.0f);
             ImGui::Spacing();
 
             ImGui::Text("Auto Block");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             AppleToggle("##ka_autoblock", &killAuraAutoBlock, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Rotation");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             AppleToggle("##ka_rotation", &killAuraRotation, 60, 32);
             ImGui::Spacing();
 
@@ -434,12 +443,12 @@ void EGL::EglThread() {
             ImGui::Spacing();
 
             ImGui::Text("Enabled");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             AppleToggle("##speed_enabled", &speedEnabled, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Speed Value");
-            ImGui::SameLine(rightPanelWidth - 60);
+            ImGui::SameLine(rightPanelWidth - 80);
             ImGui::Text("%.2f", speedValue);
             ThinSliderFloat("##speed_val", &speedValue, 0.5f, 5.0f, 4.0f, 35.0f);
             ImGui::Spacing();
@@ -453,27 +462,27 @@ void EGL::EglThread() {
             ImGui::Spacing();
 
             ImGui::Text("Enabled");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             AppleToggle("##interface_enabled", &interfaceEnabled, 60, 32);
             ImGui::Spacing();
 
             // Font Scale - 触摸宽度30px
             ImGui::Text("Font Scale");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             ImGui::Text("%.2f", fontScale);
             ThinSliderFloat("##font_scale", &fontScale, 0.5f, 2.0f, 4.0f, 30.0f);
             ImGui::Spacing();
 
             // Background Alpha - 修复文本和背景居中
             ImGui::Text("Background Alpha");
-            ImGui::SameLine(rightPanelWidth - 80);
+            ImGui::SameLine(rightPanelWidth - 100);
             ImGui::Text("%.2f", bgAlpha);
             ThinSliderFloat("##bg_alpha", &bgAlpha, 0.1f, 1.0f, 4.0f, 30.0f);
             ImGui::Spacing();
 
             // Theme Color - 修复遮挡问题
             ImGui::Text("Theme Color");
-            ImGui::SameLine(rightPanelWidth - 120);
+            ImGui::SameLine(rightPanelWidth - 140);
             ImGui::ColorEdit3("##theme_color", (float*)&themeColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
         }
         else {
