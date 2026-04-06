@@ -457,20 +457,24 @@ void EGL::EglThread() {
             AppleToggle("##interface_enabled", &interfaceEnabled, 60, 32);
             ImGui::Spacing();
 
+            // Font Scale - 触摸宽度30px
             ImGui::Text("Font Scale");
-            ImGui::SameLine(rightPanelWidth - 60);
+            ImGui::SameLine(rightPanelWidth - 80);
             ImGui::Text("%.2f", fontScale);
-            ThinSliderFloat("##font_scale", &fontScale, 0.5f, 2.0f, 4.0f, 35.0f);
+            ThinSliderFloat("##font_scale", &fontScale, 0.5f, 2.0f, 4.0f, 30.0f);
             ImGui::Spacing();
 
+            // Background Alpha - 修复文本和背景居中
             ImGui::Text("Background Alpha");
-            ImGui::SameLine(rightPanelWidth - 60);
+            ImGui::SameLine(rightPanelWidth - 80);
             ImGui::Text("%.2f", bgAlpha);
-            ThinSliderFloat("##bg_alpha", &bgAlpha, 0.1f, 1.0f, 4.0f, 35.0f);
+            ThinSliderFloat("##bg_alpha", &bgAlpha, 0.1f, 1.0f, 4.0f, 30.0f);
             ImGui::Spacing();
 
+            // Theme Color - 修复遮挡问题
             ImGui::Text("Theme Color");
-            ImGui::ColorEdit3("##theme_color", (float*)&themeColor, ImGuiColorEditFlags_NoInputs);
+            ImGui::SameLine(rightPanelWidth - 120);
+            ImGui::ColorEdit3("##theme_color", (float*)&themeColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
         }
         else {
             ImVec2 avail = ImGui::GetContentRegionAvail();
