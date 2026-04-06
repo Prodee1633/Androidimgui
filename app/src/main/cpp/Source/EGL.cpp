@@ -267,8 +267,12 @@ void EGL::EglThread() {
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 15.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 10.0f);
-        // 滚动条视觉宽度12px，但触摸区域通过padding增加
-        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 12.0f);
+        // 滚动条宽度20px
+        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarSize, 20.0f);
+        // 按钮文本垂直居中
+        ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
+        // 标题栏高度固定
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, 10.0f));
 
         ImGui::PushStyleColor(ImGuiCol_TitleBg, themeColor);
         ImGui::PushStyleColor(ImGuiCol_TitleBgActive, themeColor);
@@ -286,7 +290,8 @@ void EGL::EglThread() {
         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.2f, 0.2f, 0.23f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.25f, 0.25f, 0.28f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.1f, 0.1f, 0.12f, bgAlpha));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.08f, 0.1f, 1.0f));
+        // 删除ChildBg，避免滚动条左边出现黑色背景
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
         ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.2f, 0.2f, 0.25f, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, ImVec4(0.1f, 0.1f, 0.12f, 0.5f));
         ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, themeColor);
@@ -307,11 +312,11 @@ void EGL::EglThread() {
         ImVec2 winPos = ImGui::GetWindowPos();
         ImVec2 winSize = ImGui::GetWindowSize();
         float leftPanelWidth = 200.0f;
-        float scrollbarWidth = 12.0f;
-        float padding = 20.0f;
-        // 右侧面板宽度减去滚动条和边距
+        float scrollbarWidth = 20.0f;  // 滚动条宽度20px
+        float padding = 15.0f;  // 减少padding
+        // 右侧面板宽度
         float rightPanelWidth = winSize.x - leftPanelWidth - 50.0f;
-        // 内容可用宽度（减去滚动条和边距，避免遮挡）
+        // 内容可用宽度
         float contentAvailWidth = rightPanelWidth - scrollbarWidth - padding;
         float contentHeight = winSize.y - 130.0f;
 
@@ -328,6 +333,10 @@ void EGL::EglThread() {
             } else {
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.15f, 0.18f, 1.0f));
             }
+            // 使用SetCursorPosY让按钮文本垂直居中
+            float buttonHeight = tabHeight;
+            ImVec2 textSize = ImGui::CalcTextSize(tabs[i]);
+            float textOffsetY = (buttonHeight - textSize.y) * 0.5f;
             if (ImGui::Button(tabs[i], ImVec2(tabWidth, tabHeight))) {
                 selectedTab = i;
                 selectedModule = -1;
@@ -336,11 +345,12 @@ void EGL::EglThread() {
         }
         ImGui::Spacing();
 
-        // 左侧面板 - 按钮宽度考虑滚动条，使其居中
-        ImGui::BeginChild("LeftPanel", ImVec2(leftPanelWidth, contentHeight), true);
+        // 左侧面板 - 往左调，让按钮看起来居中
+        ImGui::SetCursorPosX(5.0f);
+        ImGui::BeginChild("LeftPanel", ImVec2(leftPanelWidth - 10.0f, contentHeight), true);
         
-        // 左侧按钮宽度：减去滚动条和边距
-        float leftButtonWidth = leftPanelWidth - scrollbarWidth - padding;
+        // 左侧按钮宽度：考虑滚动条
+        float leftButtonWidth = leftPanelWidth - scrollbarWidth - padding - 10.0f;
 
         if (selectedTab == 0) {
             bool isSelected = (selectedModule == 0);
@@ -406,43 +416,43 @@ void EGL::EglThread() {
             ImGui::Spacing();
 
             ImGui::Text("Enabled");
-            ImGui::SameLine(contentAvailWidth - 70);
+            ImGui::SameLine(contentAvailWidth - 60);
             AppleToggle("##killaura_enabled", &killAuraEnabled, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Range");
-            ImGui::SameLine(contentAvailWidth - 50);
+            ImGui::SameLine(contentAvailWidth - 40);
             ImGui::Text("%.1f", killAuraRange);
             ThinSliderFloat("##ka_range", &killAuraRange, 1.0f, 6.0f, 4.0f, 35.0f);
             ImGui::Spacing();
 
             ImGui::Text("CPS");
-            ImGui::SameLine(contentAvailWidth - 40);
+            ImGui::SameLine(contentAvailWidth - 30);
             ImGui::Text("%d", killAuraCPS);
             ThinSliderInt("##ka_cps", &killAuraCPS, 1, 20, 4.0f, 35.0f);
             ImGui::Spacing();
 
             ImGui::Text("FOV");
-            ImGui::SameLine(contentAvailWidth - 50);
+            ImGui::SameLine(contentAvailWidth - 40);
             ImGui::Text("%.0f", killAuraFOV);
             ThinSliderFloat("##ka_fov", &killAuraFOV, 30.0f, 360.0f, 4.0f, 35.0f);
             ImGui::Spacing();
 
             ImGui::Text("Auto Block");
-            ImGui::SameLine(contentAvailWidth - 70);
+            ImGui::SameLine(contentAvailWidth - 60);
             AppleToggle("##ka_autoblock", &killAuraAutoBlock, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Rotation");
-            ImGui::SameLine(contentAvailWidth - 70);
+            ImGui::SameLine(contentAvailWidth - 60);
             AppleToggle("##ka_rotation", &killAuraRotation, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Targets:");
             ImGui::Checkbox("Players", &killAuraTargetPlayers);
-            ImGui::SameLine(130);
+            ImGui::SameLine(140);
             ImGui::Checkbox("Mobs", &killAuraTargetMobs);
-            ImGui::SameLine(240);
+            ImGui::SameLine(260);
             ImGui::Checkbox("Animals", &killAuraTargetAnimals);
         }
         else if (selectedTab == 1 && selectedModule == 0) {
@@ -451,12 +461,12 @@ void EGL::EglThread() {
             ImGui::Spacing();
 
             ImGui::Text("Enabled");
-            ImGui::SameLine(contentAvailWidth - 70);
+            ImGui::SameLine(contentAvailWidth - 60);
             AppleToggle("##speed_enabled", &speedEnabled, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Speed Value");
-            ImGui::SameLine(contentAvailWidth - 50);
+            ImGui::SameLine(contentAvailWidth - 40);
             ImGui::Text("%.2f", speedValue);
             ThinSliderFloat("##speed_val", &speedValue, 0.5f, 5.0f, 4.0f, 35.0f);
             ImGui::Spacing();
@@ -470,24 +480,24 @@ void EGL::EglThread() {
             ImGui::Spacing();
 
             ImGui::Text("Enabled");
-            ImGui::SameLine(contentAvailWidth - 70);
+            ImGui::SameLine(contentAvailWidth - 60);
             AppleToggle("##interface_enabled", &interfaceEnabled, 60, 32);
             ImGui::Spacing();
 
             ImGui::Text("Font Scale");
-            ImGui::SameLine(contentAvailWidth - 50);
+            ImGui::SameLine(contentAvailWidth - 40);
             ImGui::Text("%.2f", fontScale);
             ThinSliderFloat("##font_scale", &fontScale, 0.5f, 2.0f, 4.0f, 30.0f);
             ImGui::Spacing();
 
             ImGui::Text("Background Alpha");
-            ImGui::SameLine(contentAvailWidth - 50);
+            ImGui::SameLine(contentAvailWidth - 40);
             ImGui::Text("%.2f", bgAlpha);
             ThinSliderFloat("##bg_alpha", &bgAlpha, 0.1f, 1.0f, 4.0f, 30.0f);
             ImGui::Spacing();
 
             ImGui::Text("Theme Color");
-            ImGui::SameLine(contentAvailWidth - 110);
+            ImGui::SameLine(contentAvailWidth - 100);
             ImGui::ColorEdit3("##theme_color", (float*)&themeColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
         }
         else {
@@ -502,32 +512,33 @@ void EGL::EglThread() {
 
         ImGui::End();
 
-        // 右下角大小调节手柄 - 在窗口内
-        float handleSize = 60.0f;
-        ImVec2 resizePos(winPos.x + winSize.x - handleSize - 5, winPos.y + winSize.y - handleSize - 5);
+        // 左下角大小调节手柄
+        float handleSize = 50.0f;
+        ImVec2 resizePos(winPos.x + 5, winPos.y + winSize.y - handleSize - 5);
         
         ImGui::SetCursorScreenPos(resizePos);
-        if (ImGui::InvisibleButton("##resize", ImVec2(handleSize, handleSize))) {
-        }
+        ImGui::InvisibleButton("##resize", ImVec2(handleSize, handleSize));
 
         ImDrawList* fgDrawList = ImGui::GetForegroundDrawList();
         ImU32 resizeColor = ImGui::ColorConvertFloat4ToU32(themeColor);
+        // 绘制左下角三角形手柄
         for (int i = 0; i < 3; i++) {
-            float offset = i * 10.0f;
+            float offset = i * 8.0f;
             fgDrawList->AddLine(
-                ImVec2(resizePos.x + 12 + offset, resizePos.y + handleSize - 10),
-                ImVec2(resizePos.x + handleSize - 10, resizePos.y + 12 + offset),
+                ImVec2(resizePos.x + 10, resizePos.y + handleSize - 10 - offset),
+                ImVec2(resizePos.x + 10 + offset, resizePos.y + handleSize - 10),
                 resizeColor, 4.0f
             );
         }
 
         if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0)) {
             ImVec2 delta = ImGui::GetIO().MouseDelta;
+            // 左下角拖动：x增加向右，y增加向下
             windowSize.x = ImMax(600.0f, windowSize.x + delta.x);
             windowSize.y = ImMax(400.0f, windowSize.y + delta.y);
         }
 
-        ImGui::PopStyleVar(5);
+        ImGui::PopStyleVar(7);
         ImGui::PopStyleColor(23);
 
         imguiMainWinEnd();
