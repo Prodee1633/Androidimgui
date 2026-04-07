@@ -244,31 +244,9 @@ bool AnimatedSliderInt(int* v, int v_min, int v_max, float& displayValue, float 
 }
 
 // 辉光文本 - 使用动画强度，辉光效果0到3，使用字体颜色
-void DrawGlowTextAnimated(ImDrawList* drawList, ImVec2 pos, const char* text, float glowIntensity, ImVec4 textColor) {
+// 普通文本绘制（无辉光）
+void DrawTextSimple(ImDrawList* drawList, ImVec2 pos, const char* text, ImVec4 textColor) {
     ImU32 color = ImGui::ColorConvertFloat4ToU32(textColor);
-    
-    // 辉光效果从0到3
-    float maxGlow = 3.0f;
-    float currentGlow = glowIntensity * maxGlow;
-    int layers = (int)(currentGlow * 2.0f);
-    if (layers < 1) layers = 1;
-    
-    for (int i = layers; i >= 1; i--) {
-        float alpha = (80.0f / i) * glowIntensity;
-        // 辉光颜色使用字体颜色
-        ImU32 glowColor = IM_COL32(
-            (int)(textColor.x * 255),
-            (int)(textColor.y * 255),
-            (int)(textColor.z * 255),
-            (int)alpha
-        );
-        float offset = i * 0.8f;
-        drawList->AddText(ImVec2(pos.x - offset, pos.y), glowColor, text);
-        drawList->AddText(ImVec2(pos.x + offset, pos.y), glowColor, text);
-        drawList->AddText(ImVec2(pos.x, pos.y - offset), glowColor, text);
-        drawList->AddText(ImVec2(pos.x, pos.y + offset), glowColor, text);
-    }
-    // 绘制主文本
     drawList->AddText(pos, color, text);
 }
 
@@ -440,10 +418,8 @@ void EGL::EglThread() {
         ImVec2 winSize = ImGui::GetWindowSize();
         // 调整左侧面板宽度，修复右边空白问题
         float leftPanelWidth = 220.0f;
-        float scrollbarWidth = 27.8f;
-        float separatorWidth = 20.0f;
-        // 右侧面板宽度考虑滚动条位置
-        float rightPanelWidth = winSize.x - leftPanelWidth - separatorWidth - scrollbarWidth - 30.0f;
+        // 硬编码右侧面板宽度
+        float rightPanelWidth = 650.0f;
         float contentHeight = winSize.y - 140.0f;
 
         float animSpeed = 0.08f;
@@ -563,23 +539,19 @@ void EGL::EglThread() {
         }
 
         for (int i = 0; i < moduleCount; i++) {
-            // 选中只保留透明度和辉光动画，移除向右偏移
+            // 选中透明度和向右偏移动画
             float opacity = Lerp(0.6f, 1.0f, moduleGlowAnim[i]);
+            float offsetX = Lerp(0.0f, 7.0f, moduleGlowAnim[i]);
             
             ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
             
-            const char* moduleLabel = isChinese ? currentModulesCN[i] : currentModules[i];
+            ImVec2 buttonPos = ImGui::GetCursorPos();
+            buttonPos.x += offsetX;
+            ImGui::SetCursorPos(buttonPos);
             
-            // 绘制辉光文本（使用动画强度和字体颜色）
-            if (moduleGlowAnim[i] > 0.001f) {
-                ImVec2 cursorScreenPos = ImGui::GetCursorScreenPos();
-                ImVec2 textSize = ImGui::CalcTextSize(moduleLabel);
-                float textX = cursorScreenPos.x + (leftButtonWidth - textSize.x) * 0.5f;
-                float textY = cursorScreenPos.y + (moduleButtonHeight - textSize.y) * 0.5f;
-                DrawGlowTextAnimated(drawList, ImVec2(textX, textY), moduleLabel, moduleGlowAnim[i], textColor);
-            }
+            const char* moduleLabel = isChinese ? currentModulesCN[i] : currentModules[i];
             
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(textColor.x*0.8f, textColor.y*0.8f, textColor.z*0.8f, opacity));
             if (ImGui::Button(moduleLabel, ImVec2(leftButtonWidth, moduleButtonHeight))) {
