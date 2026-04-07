@@ -227,11 +227,10 @@ bool AnimatedSliderFloat(float* v, float v_min, float v_max, float& displayValue
     // 背景条
     drawList->AddRectFilled(visualBb.Min, visualBb.Max, bgColor, rounding);
     
-    // 填充条 - 使用动画值，确保不超过边界
-    float fillT = (displayValue - v_min) / (v_max - v_min);
+    // 填充条 - 使用实际值*v，确保准确反映当前值
+    float fillT = (*v - v_min) / (v_max - v_min);
     fillT = ImClamp(fillT, 0.0f, 1.0f);
     float fillWidth = visualBb.GetWidth() * fillT;
-    if (fillWidth > visualBb.GetWidth()) fillWidth = visualBb.GetWidth();
     drawList->AddRectFilled(visualBb.Min, ImVec2(visualBb.Min.x + fillWidth, visualBb.Max.y), fillColor, rounding);
 
     return pressed || held;
