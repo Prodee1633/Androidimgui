@@ -418,8 +418,8 @@ void EGL::EglThread() {
         ImVec2 winSize = ImGui::GetWindowSize();
         // 调整左侧面板宽度，修复右边空白问题
         float leftPanelWidth = 220.0f;
-        // 硬编码右侧面板宽度（增加100px，减去滚动条宽度避免遮挡）
-        float rightPanelWidth = 720.0f;
+        // 硬编码右侧面板宽度（再增加100px）
+        float rightPanelWidth = 820.0f;
         float contentHeight = winSize.y - 140.0f;
 
         float animSpeed = 0.08f;
@@ -1005,21 +1005,21 @@ void EGL::EglThread() {
         }
         else if (selectedTab == 4 && selectedModule >= 0) {
             if (selectedModule == 0) {
-                // Interface
+                // Interface - 右侧元素向左移动避免被滚动条遮挡
                 ImGui::Text(isChinese ? "界面" : "Interface");
                 ImGui::Separator();
                 ImGui::Spacing();
                 
                 // 启用开关
                 ImGui::Text(isChinese ? "启用" : "Enabled");
-                ImGui::SameLine(rightPanelWidth - 80);
+                ImGui::SameLine(rightPanelWidth - 130);
                 if (AnimatedToggle("##interface_enabled", &visualEnabled[0], 60, 28, toggleAnimProgress[40])) {}
                 ImGui::Spacing();
                 ImGui::Spacing();
                 
                 // 背景透明度滑块
                 ImGui::Text(isChinese ? "背景透明度" : "Background Alpha");
-                ImGui::SameLine(rightPanelWidth - 60);
+                ImGui::SameLine(rightPanelWidth - 110);
                 ImGui::Text("%.2f", bgAlpha);
                 ImGui::Spacing();
                 AnimatedSliderFloat(&bgAlpha, 0.1f, 1.0f, sliderDisplayValue[40], sliderAnimSpeed);
@@ -1028,14 +1028,14 @@ void EGL::EglThread() {
                 
                 // 主题颜色
                 ImGui::Text(isChinese ? "主题颜色" : "Theme Color");
-                ImGui::SameLine(rightPanelWidth - 90);
+                ImGui::SameLine(rightPanelWidth - 140);
                 ImGui::ColorEdit3("##theme_color", (float*)&themeColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
                 ImGui::Spacing();
                 ImGui::Spacing();
                 
                 // 主题透明度
                 ImGui::Text(isChinese ? "主题透明度" : "Theme Alpha");
-                ImGui::SameLine(rightPanelWidth - 60);
+                ImGui::SameLine(rightPanelWidth - 110);
                 ImGui::Text("%.2f", themeOverlayAlpha);
                 ImGui::Spacing();
                 AnimatedSliderFloat(&themeOverlayAlpha, 0.1f, 1.0f, sliderDisplayValue[41], sliderAnimSpeed);
@@ -1044,7 +1044,7 @@ void EGL::EglThread() {
                 
                 // 全局圆角
                 ImGui::Text(isChinese ? "全局圆角" : "Global Rounding");
-                ImGui::SameLine(rightPanelWidth - 60);
+                ImGui::SameLine(rightPanelWidth - 110);
                 ImGui::Text("%.0f", globalRounding);
                 ImGui::Spacing();
                 AnimatedSliderFloat(&globalRounding, 0.0f, 20.0f, sliderDisplayValue[42], sliderAnimSpeed);
@@ -1053,14 +1053,14 @@ void EGL::EglThread() {
                 
                 // 全局字体颜色
                 ImGui::Text(isChinese ? "字体颜色" : "Text Color");
-                ImGui::SameLine(rightPanelWidth - 90);
+                ImGui::SameLine(rightPanelWidth - 140);
                 ImGui::ColorEdit3("##text_color", (float*)&textColor, ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel);
                 ImGui::Spacing();
                 ImGui::Spacing();
                 
                 // 客户端名称
                 ImGui::Text(isChinese ? "客户端名称" : "Client Name");
-                ImGui::SameLine(rightPanelWidth - 210);
+                ImGui::SameLine(rightPanelWidth - 260);
                 ImGui::PushItemWidth(180);
                 ImGui::InputText("##client_name", clientName, sizeof(clientName));
                 ImGui::PopItemWidth();
@@ -1069,7 +1069,7 @@ void EGL::EglThread() {
                 
                 // 中英文切换
                 ImGui::Text(isChinese ? "中文" : "English");
-                ImGui::SameLine(rightPanelWidth - 80);
+                ImGui::SameLine(rightPanelWidth - 130);
                 if (AnimatedToggle("##lang_toggle", &isChinese, 60, 28, langToggleAnim)) {}
             }
             else {
