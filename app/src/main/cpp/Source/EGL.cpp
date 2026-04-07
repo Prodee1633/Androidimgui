@@ -368,7 +368,7 @@ void EGL::EglThread() {
         
         // 左侧模块列表 - 带滚动条
         ImGui::SetCursorPos(ImVec2(10, 105));
-        ImGui::BeginChild("LeftPanel", ImVec2(leftPanelWidth, winSize.y - 150), false, ImGuiWindowFlags_VerticalScrollbar);
+        ImGui::BeginChild("LeftPanel", ImVec2(leftPanelWidth, winSize.y - 150), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
         
         // 更新模块动画 - 只有透明度和辉光，没有向右偏移
         for (int i = 0; i < moduleCount; i++) {
@@ -427,7 +427,7 @@ void EGL::EglThread() {
         
         // 右侧设置面板 - 带滚动条
         ImGui::SetCursorPos(ImVec2(leftPanelWidth + 30, 105));
-        ImGui::BeginChild("RightPanel", ImVec2(rightPanelWidth, winSize.y - 150), false, ImGuiWindowFlags_VerticalScrollbar);
+        ImGui::BeginChild("RightPanel", ImVec2(rightPanelWidth, winSize.y - 150), false, ImGuiWindowFlags_AlwaysVerticalScrollbar);
         
         // 当前选中模块的设置
         ImGui::TextColored(fontColor, "%s %s", GetText("设置", "Settings"), GetModuleName(selectedModule));
