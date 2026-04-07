@@ -182,7 +182,7 @@ bool AnimatedSliderFloat(float* v, float v_min, float v_max, float& displayValue
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
     
-    float availWidth = ImGui::GetContentRegionAvail().x;
+    float availWidth = ImGui::GetContentRegionAvail().x - 30.0f; // 减去空间避免被滚动条遮挡
     float lineHeight = 6.0f;
     float touchHeight = 30.0f;
     
@@ -298,9 +298,6 @@ void EGL::EglThread() {
     static int bindingTab = -1;
     static int bindingModule = -1;
     static bool isWaitingForBind = false;
-    
-    // 右面板额外宽度（可在Interface中调节）
-    static float rightPanelExtraWidth = 0.0f;
 
     // 模块数据
     static bool combatEnabled[10] = {false};
@@ -421,8 +418,8 @@ void EGL::EglThread() {
         ImVec2 winSize = ImGui::GetWindowSize();
         // 调整左侧面板宽度，修复右边空白问题
         float leftPanelWidth = 220.0f;
-        // 右面板宽度自适应（窗口宽度 - 左面板 - 分隔线 - 滚动条空间 + 额外宽度）
-        float rightPanelWidth = winSize.x - leftPanelWidth - 50.0f - 30.0f + rightPanelExtraWidth;
+        // 右面板宽度自适应（窗口宽度 - 左面板 - 分隔线 - 滚动条空间 + 固定75px）
+        float rightPanelWidth = winSize.x - leftPanelWidth - 50.0f - 30.0f + 75.0f;
         float contentHeight = winSize.y - 140.0f;
 
         float animSpeed = 0.08f;
@@ -622,26 +619,43 @@ void EGL::EglThread() {
             ImGui::Spacing();
         };
         
-        // 按键绑定区域 - 右边显示"None"文本，可点击触发弹窗
+        // 模式选择Combo - 使用官方默认的可展开选择控件
+        auto DrawModeCombo = [&](const char* name, int idx, const char* items[], int itemCount, int* currentItem) {
+            float availWidth = ImGui::GetContentRegionAvail().x;
+            
+            ImGui::Text("%s", name);
+            
+            // Combo放到右侧
+            ImGui::SameLine(availWidth - 150);
+            ImGui::PushItemWidth(140);
+            
+            // 构建items字符串（用\0分隔）
+            std::string comboItems;
+            for (int i = 0; i < itemCount; i++) {
+                if (i > 0) comboItems += "\0";
+                comboItems += items[i];
+            }
+            comboItems += "\0";
+            
+            ImGui::Combo("##mode", currentItem, comboItems.c_str());
+            ImGui::PopItemWidth();
+            
+            ImGui::Spacing();
+            ImGui::Spacing();
+        };
+        
+        // 按键绑定区域 - 右边显示"None"文本，无点击行为
         auto DrawKeyBind = [&](int idx) {
             float availWidth = ImGui::GetContentRegionAvail().x;
             
             ImGui::Text(isChinese ? "按键绑定" : "Key Bind");
             
-            // 放到最右边
-            ImGui::SameLine(availWidth - 60);
+            // 放到最右边，向左偏移避免e被遮挡
+            ImGui::SameLine(availWidth - 80);
             
-            // 可点击的"None"文本
-            ImVec4 textColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
-            ImGui::PushStyleColor(ImGuiCol_Text, textColor);
-            if (ImGui::Selectable("None", false, ImGuiSelectableFlags_None, ImVec2(50, 0))) {
-                bindingTab = selectedTab;
-                bindingModule = idx;
-                isWaitingForBind = true;
-                // 触发安卓弹窗
-                input->toast("请在三秒内按下你想要绑定的按键！");
-            }
-            ImGui::PopStyleColor();
+            // 显示"None"文本，无点击行为
+            ImVec4 noneTextColor = ImVec4(0.7f, 0.7f, 0.7f, 1.0f);
+            ImGui::TextColored(noneTextColor, "None");
             
             ImGui::Spacing();
             ImGui::Separator();
@@ -680,7 +694,13 @@ void EGL::EglThread() {
                     ImGui::Spacing();
                     DrawKeyBind(2);
                     DrawSettingRow(isChinese ? "启用" : "Enabled", 2, true);
-                    DrawSettingRow(isChinese ? "模式" : "Mode", 2, false, &combatValues[2][0], 0, 2);
+                    {
+                        const char* critModesCN[] = {"普通", "小包", "跳跃"};
+                        const char* critModesEN[] = {"Normal", "Packet", "Jump"};
+                        int critModeIdx = (int)combatValues[2][0];
+                        DrawModeCombo(isChinese ? "模式" : "Mode", 2, isChinese ? critModesCN : critModesEN, 3, &critModeIdx);
+                        combatValues[2][0] = (float)critModeIdx;
+                    }
                     break;
                 case 3:
                     ImGui::Text(isChinese ? "速度减免" : "Velocity");
@@ -751,7 +771,13 @@ void EGL::EglThread() {
                     DrawKeyBind(0);
                     DrawSettingRow(isChinese ? "启用" : "Enabled", 0, true);
                     DrawSettingRow(isChinese ? "速度值" : "Speed Value", 0, false, &moveValues[0][0], 0.5f, 5.0f);
-                    DrawSettingRow(isChinese ? "模式" : "Mode", 0, false, &moveValues[0][1], 0, 3);
+                    {
+                        const char* speedModesCN[] = {"普通", "YPort", "跳跃", "地面"};
+                        const char* speedModesEN[] = {"Normal", "YPort", "Jump", "Ground"};
+                        int speedModeIdx = (int)moveValues[0][1];
+                        DrawModeCombo(isChinese ? "模式" : "Mode", 0, isChinese ? speedModesCN : speedModesEN, 4, &speedModeIdx);
+                        moveValues[0][1] = (float)speedModeIdx;
+                    }
                     break;
                 case 1:
                     ImGui::Text(isChinese ? "飞行" : "Fly");
@@ -817,7 +843,13 @@ void EGL::EglThread() {
                     ImGui::Spacing();
                     DrawKeyBind(8);
                     DrawSettingRow(isChinese ? "启用" : "Enabled", 8, true);
-                    DrawSettingRow(isChinese ? "模式" : "Mode", 8, false, &moveValues[8][0], 0, 2);
+                    {
+                        const char* jesusModesCN[] = {"普通", "海豚", "跳跃"};
+                        const char* jesusModesEN[] = {"Normal", "Dolphin", "Jump"};
+                        int jesusModeIdx = (int)moveValues[8][0];
+                        DrawModeCombo(isChinese ? "模式" : "Mode", 8, isChinese ? jesusModesCN : jesusModesEN, 3, &jesusModeIdx);
+                        moveValues[8][0] = (float)jesusModeIdx;
+                    }
                     break;
                 case 9:
                     ImGui::Text(isChinese ? "爬墙" : "Spider");
@@ -922,7 +954,13 @@ void EGL::EglThread() {
                     ImGui::Spacing();
                     DrawKeyBind(0);
                     DrawSettingRow(isChinese ? "启用" : "Enabled", 0, true);
-                    DrawSettingRow(isChinese ? "模式" : "Mode", 0, false, &playerValues[0][0], 0, 2);
+                    {
+                        const char* nofallModesCN[] = {"普通", "小包", " spoof"};
+                        const char* nofallModesEN[] = {"Normal", "Packet", "Spoof"};
+                        int nofallModeIdx = (int)playerValues[0][0];
+                        DrawModeCombo(isChinese ? "模式" : "Mode", 0, isChinese ? nofallModesCN : nofallModesEN, 3, &nofallModeIdx);
+                        playerValues[0][0] = (float)nofallModeIdx;
+                    }
                     break;
                 case 1:
                     ImGui::Text(isChinese ? "抗火" : "AntiFire");
@@ -1009,8 +1047,6 @@ void EGL::EglThread() {
                 DrawSettingRow(isChinese ? "背景透明度" : "Background Alpha", 0, false, &bgAlpha, 0.1f, 1.0f);
                 DrawSettingRow(isChinese ? "主题透明度" : "Theme Alpha", 0, false, &themeOverlayAlpha, 0.1f, 1.0f);
                 DrawSettingRow(isChinese ? "全局圆角" : "Global Rounding", 0, false, &globalRounding, 0.0f, 20.0f);
-                // 右面板额外宽度调节
-                DrawSettingRow(isChinese ? "右面板额外宽度" : "Right Panel Extra", 0, false, &rightPanelExtraWidth, -200.0f, 200.0f);
             }
             else {
                 switch(selectedModule) {
@@ -1020,7 +1056,13 @@ void EGL::EglThread() {
                         ImGui::Spacing();
                         DrawKeyBind(1);
                         DrawSettingRow(isChinese ? "启用" : "Enabled", 1, true);
-                        DrawSettingRow(isChinese ? "模式" : "Mode", 1, false, &visualValues[1][0], 0, 3);
+                        {
+                            const char* espModesCN[] = {"方框", "2D", "3D", "角落"};
+                            const char* espModesEN[] = {"Box", "2D", "3D", "Corner"};
+                            int espModeIdx = (int)visualValues[1][0];
+                            DrawModeCombo(isChinese ? "模式" : "Mode", 1, isChinese ? espModesCN : espModesEN, 4, &espModeIdx);
+                            visualValues[1][0] = (float)espModeIdx;
+                        }
                         DrawSettingRow(isChinese ? "玩家" : "Players", 1, true);
                         DrawSettingRow(isChinese ? "怪物" : "Mobs", 1, true);
                         break;
