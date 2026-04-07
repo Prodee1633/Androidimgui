@@ -182,7 +182,7 @@ bool AnimatedSliderFloat(float* v, float v_min, float v_max, float& displayValue
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
     
-    float availWidth = ImGui::GetContentRegionAvail().x - 30.0f; // 减去空间避免被滚动条遮挡
+    float availWidth = ImGui::GetContentRegionAvail().x - 40.0f; // 减去空间避免被滚动条遮挡
     float lineHeight = 6.0f;
     float touchHeight = 30.0f;
     
@@ -227,10 +227,11 @@ bool AnimatedSliderFloat(float* v, float v_min, float v_max, float& displayValue
     // 背景条
     drawList->AddRectFilled(visualBb.Min, visualBb.Max, bgColor, rounding);
     
-    // 填充条 - 使用动画值
+    // 填充条 - 使用动画值，确保不超过边界
     float fillT = (displayValue - v_min) / (v_max - v_min);
     fillT = ImClamp(fillT, 0.0f, 1.0f);
     float fillWidth = visualBb.GetWidth() * fillT;
+    if (fillWidth > visualBb.GetWidth()) fillWidth = visualBb.GetWidth();
     drawList->AddRectFilled(visualBb.Min, ImVec2(visualBb.Min.x + fillWidth, visualBb.Max.y), fillColor, rounding);
 
     return pressed || held;
@@ -629,15 +630,22 @@ void EGL::EglThread() {
             ImGui::SameLine(availWidth - 150);
             ImGui::PushItemWidth(140);
             
-            // 构建items字符串（用\0分隔）
-            std::string comboItems;
+            // 构建items字符串（用\0分隔，以\0\0结尾）
+            static char comboItemsBuffer[256];
+            comboItemsBuffer[0] = '\0';
+            int pos = 0;
             for (int i = 0; i < itemCount; i++) {
-                if (i > 0) comboItems += "\0";
-                comboItems += items[i];
+                if (i > 0) {
+                    comboItemsBuffer[pos++] = '\0';
+                }
+                int len = strlen(items[i]);
+                memcpy(&comboItemsBuffer[pos], items[i], len);
+                pos += len;
             }
-            comboItems += "\0";
+            comboItemsBuffer[pos++] = '\0';
+            comboItemsBuffer[pos] = '\0';
             
-            ImGui::Combo("##mode", currentItem, comboItems.c_str());
+            ImGui::Combo("##mode", currentItem, comboItemsBuffer);
             ImGui::PopItemWidth();
             
             ImGui::Spacing();
