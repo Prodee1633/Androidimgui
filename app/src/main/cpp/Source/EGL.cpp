@@ -97,7 +97,12 @@ void EGL::EglThread() {
     if (this->initImgui() != 1) return;
     ThreadIo = true;
     
-    // 基础配置变量
+    // 【修复1】移出循环：恢复到原始位置，只初始化一次输入系统，防止多线程抢占问题
+    if (input == nullptr || io == nullptr) { ThreadIo = false; return; }
+    input->initImguiIo(io); 
+    input->setImguiContext(g);
+
+    // 基础配置变量 (外部目标值)
     static float targetWidth = 400.0f, targetHeight = 250.0f;
     static float targetPosX = 100.0f, targetPosY = 100.0f;
     static float targetAlpha = 0.8f, targetRounding = 20.0f;
@@ -105,10 +110,10 @@ void EGL::EglThread() {
     // 文本 Melt 变量
     static float textScale = 1.0f;
     static float textOffsetX = 20.0f, textOffsetY = 20.0f;
-    static float textGlowIntensity = 5.0f; // 辉光范围
-    static ImVec4 textGlowColor = ImVec4(1, 1, 1, 0.5f); // 辉光颜色
+    static float textGlowIntensity = 5.0f; 
+    static ImVec4 textGlowColor = ImVec4(1, 1, 1, 0.5f); 
 
-    // 动画平滑变量
+    // 动画平滑变量 (当前实际渲染值)
     static float animWidth = 0, animHeight = 0;
     static float animPosX = 0, animPosY = 0;
     static float animAlpha = 0;
@@ -117,32 +122,28 @@ void EGL::EglThread() {
     while (true) {
         if (this->isDestroy) { ThreadIo = false; cond.notify_all(); return; }
         if (this->isChage) { glViewport(0, 0, this->surfaceWidth, this->surfaceHigh); this->isChage = false; }
-        this->clearBuffers();
+        this->clearBuffers(); 
         if (!ActivityState) { usleep(16000); continue; }
         
         imguiMainWinStart();
         
-        // 1. 鲁棒性检查，防止闪退
-        if (input == nullptr || io == nullptr) { 
-            ImGui::EndFrame(); 
-            usleep(16000); 
-            continue; 
-        }
-        input->initImguiIo(io); 
-        input->setImguiContext(g);
-
         float dt = io->DeltaTime;
 
-        // 2. 线性过渡动画计算 (Lerp)
+        // 【线性过渡动画计算】 - 让当前值不断向目标值平滑靠近
         animWidth  += (targetWidth - animWidth)   * animSpeed * dt;
         animHeight += (targetHeight - animHeight) * animSpeed * dt;
         animPosX   += (targetPosX - animPosX)     * animSpeed * dt;
         animPosY   += (targetPosY - animPosY)     * animSpeed * dt;
         animAlpha  += (targetAlpha - animAlpha)   * animSpeed * dt;
 
-        // 3. 调节菜单 (控制台)
+        // 1. 调节菜单 (控制台)
         ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
         ImGui::Begin("UI控制器");
+        
+        // 【修复2】补回空指针：核心修复！底层触摸事件需要依赖这个 g_window 指针，缺少它就会一摸屏幕就闪退
+        this->g_window = ImGui::GetCurrentWindow();
+        input->g_window = this->g_window;
+
         ImGui::Text("矩形设置");
         ImGui::SliderFloat("宽度", &targetWidth, 100, 1000);
         ImGui::SliderFloat("高度", &targetHeight, 100, 1000);
@@ -161,15 +162,14 @@ void EGL::EglThread() {
         ImGui::ColorEdit4("辉光颜色", (float*)&textGlowColor);
         ImGui::End();
 
-        // 4. 动画矩形绘制
-        // 使用一个全屏覆盖层作为画布，防止窗口标题栏干扰，这也是解决“一摸就闪退”的有效方法
+        // 2. 动画矩形绘制 (无边框全屏画布)
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(ImVec2(surfaceWidth, surfaceHigh));
         ImGui::Begin("Canvas", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings);
         
         ImDrawList* drawList = ImGui::GetWindowDrawList();
         
-        // 矩形绝对坐标
+        // 获取带动画计算的矩形绝对坐标
         ImVec2 rectMin = ImVec2(animPosX, animPosY);
         ImVec2 rectMax = ImVec2(animPosX + animWidth, animPosY + animHeight);
 
@@ -187,17 +187,16 @@ void EGL::EglThread() {
         // B. 绘制黑色主矩形
         drawList->AddRectFilled(rectMin, rectMax, IM_COL32(0, 0, 0, (int)(animAlpha * 255)), targetRounding);
 
-        // C. 绘制文本 "Melt" (位置跟随矩形动画)
+        // C. 绘制文本 "Melt" (位置跟随矩形偏移)
         ImVec2 textPos = ImVec2(rectMin.x + textOffsetX, rectMin.y + textOffsetY);
         float fontSize = 32.0f * textScale;
         
-        // 绘制文本辉光 (通过多层叠加)
+        // 绘制文本辉光 (通过多层透明度叠加模拟发光)
         if (textGlowIntensity > 0.1f) {
             for (int i = 1; i <= 3; i++) {
                 float glowAlpha = (1.0f - (i / 3.0f)) * textGlowColor.w * animAlpha;
                 ImU32 gCol = ImGui::ColorConvertFloat4ToU32(ImVec4(textGlowColor.x, textGlowColor.y, textGlowColor.z, glowAlpha));
                 float offset = (i * textGlowIntensity) / 3.0f;
-                // 四周偏移绘制模拟模糊
                 drawList->AddText(imFont, fontSize, ImVec2(textPos.x + offset, textPos.y), gCol, "Melt");
                 drawList->AddText(imFont, fontSize, ImVec2(textPos.x - offset, textPos.y), gCol, "Melt");
                 drawList->AddText(imFont, fontSize, ImVec2(textPos.x, textPos.y + offset), gCol, "Melt");
