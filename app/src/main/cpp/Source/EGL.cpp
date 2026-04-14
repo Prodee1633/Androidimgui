@@ -8,6 +8,10 @@
 #include <cmath>
 #include <algorithm>
 
+// ---------------------------------------------------------
+// 基础 EGL 结构保持不变
+// ---------------------------------------------------------
+
 EGL::EGL() {
     mEglDisplay = EGL_NO_DISPLAY;
     mEglSurface = EGL_NO_SURFACE;
@@ -19,34 +23,19 @@ static bool RunInitImgui;
 
 int EGL::initEgl() {
     mEglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (mEglDisplay == EGL_NO_DISPLAY) {
-        return -1;
-    }
+    if (mEglDisplay == EGL_NO_DISPLAY) return -1;
     EGLint *version = new EGLint[2];
-    if (!eglInitialize(mEglDisplay, &version[0], &version[1])) {
-        return -1;
-    }
-    const EGLint attribs[] = {EGL_BUFFER_SIZE, 32, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
-                              EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 8, EGL_STENCIL_SIZE, 8, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_NONE};
+    if (!eglInitialize(mEglDisplay, &version[0], &version[1])) return -1;
+    const EGLint attribs[] = {EGL_BUFFER_SIZE, 32, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 8, EGL_STENCIL_SIZE, 8, EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_SURFACE_TYPE, EGL_WINDOW_BIT, EGL_NONE};
     EGLint num_config;
-    if (!eglGetConfigs(mEglDisplay, NULL, 1, &num_config)) {
-        return -1;
-    }
-    if (!eglChooseConfig(mEglDisplay, attribs, &mEglConfig, 1, &num_config)) {
-        return -1;
-    }
+    if (!eglGetConfigs(mEglDisplay, NULL, 1, &num_config)) return -1;
+    if (!eglChooseConfig(mEglDisplay, attribs, &mEglConfig, 1, &num_config)) return -1;
     int attrib_list[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
     mEglContext = eglCreateContext(mEglDisplay, mEglConfig, EGL_NO_CONTEXT, attrib_list);
-    if (mEglContext == EGL_NO_CONTEXT) {
-        return -1;
-    }
+    if (mEglContext == EGL_NO_CONTEXT) return -1;
     mEglSurface = eglCreateWindowSurface(mEglDisplay, mEglConfig, SurfaceWin, NULL);
-    if (mEglSurface == EGL_NO_SURFACE) {
-        return -1;
-    }
-    if (!eglMakeCurrent(mEglDisplay, mEglSurface, mEglSurface, mEglContext)) {
-        return -1;
-    }
+    if (mEglSurface == EGL_NO_SURFACE) return -1;
+    if (!eglMakeCurrent(mEglDisplay, mEglSurface, mEglSurface, mEglContext)) return -1;
     return 1;
 }
 
@@ -59,7 +48,6 @@ int EGL::initImgui() {
         return 1;
     }
     RunInitImgui = true;
-
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     io = &ImGui::GetIO();
@@ -72,17 +60,9 @@ int EGL::initImgui() {
     ImFontConfig font_cfg;
     font_cfg.FontDataOwnedByAtlas = false;
     imFont = io->Fonts->AddFontFromMemoryTTF((void *) OPPOSans_H, OPPOSans_H_size, 32.0f, &font_cfg, io->Fonts->GetGlyphRangesChineseFull());
-    io->MouseDoubleClickTime = 0.0001f;
     g = ImGui::GetCurrentContext();
     style =&ImGui::GetStyle();
     style->ScaleAllSizes(4.0f);
-    style->FramePadding=ImVec2(10.0f,20.0f);
-    std::string LoadFile = this->SaveDir;
-    LoadFile += "/Style.dat";
-    ImGuiStyle s;
-    if (MyFile::ReadFile(&s,LoadFile.c_str())==1){
-       *style=s;
-    }
     return 1;
 }
 
@@ -90,8 +70,6 @@ void EGL::onSurfaceCreate(JNIEnv *env, jobject surface, int SurfaceWidth, int Su
     this->SurfaceWin = ANativeWindow_fromSurface(env, surface);
     this->surfaceWidth = SurfaceWidth;
     this->surfaceHigh = SurfaceHigh;
-    this->surfaceWidthHalf = this->surfaceWidth / 2;
-    this->surfaceHighHalf = this->surfaceHigh / 2;
     SurfaceThread = new std::thread([this] { EglThread(); });
     SurfaceThread->detach();
 }
@@ -99,8 +77,6 @@ void EGL::onSurfaceCreate(JNIEnv *env, jobject surface, int SurfaceWidth, int Su
 void EGL::onSurfaceChange(int SurfaceWidth, int SurfaceHigh) {
     this->surfaceWidth = SurfaceWidth;
     this->surfaceHigh = SurfaceHigh;
-    this->surfaceWidthHalf = this->surfaceWidth / 2;
-    this->surfaceHighHalf = this->surfaceHigh / 2;
     this->isChage = true;
 }
 
@@ -112,125 +88,140 @@ void EGL::onSurfaceDestroy() {
     SurfaceThread = nullptr;
 }
 
+// ---------------------------------------------------------
+// 核心重写：EglThread
+// ---------------------------------------------------------
+
 void EGL::EglThread() {
     if (this->initEgl() != 1) return;
     if (this->initImgui() != 1) return;
     ThreadIo = true;
-    if (input == nullptr || io == nullptr) { ThreadIo = false; return; }
-    input->initImguiIo(io); input->setImguiContext(g);
-
-    // ==========================================
-    // UI 控制变量定义区
-    // ==========================================
-    // 这些变量将由外部菜单控制，并直接影响下方绘制的矩形
-    static float rectWidth = 400.0f;     // 矩形宽度 (长)
-    static float rectHeight = 250.0f;    // 矩形高度 (宽)
-    static float rectAlpha = 0.8f;       // 矩形透明度 (0.0 完全透明, 1.0 完全不透明)
-    static float rectRounding = 20.0f;   // 矩形圆角大小
     
-    static float shadowSize = 30.0f;     // 阴影扩散范围
-    static float shadowAlpha = 0.5f;     // 阴影最大透明度
+    // 基础配置变量
+    static float targetWidth = 400.0f, targetHeight = 250.0f;
+    static float targetPosX = 100.0f, targetPosY = 100.0f;
+    static float targetAlpha = 0.8f, targetRounding = 20.0f;
+    
+    // 文本 Melt 变量
+    static float textScale = 1.0f;
+    static float textOffsetX = 20.0f, textOffsetY = 20.0f;
+    static float textGlowIntensity = 5.0f; // 辉光范围
+    static ImVec4 textGlowColor = ImVec4(1, 1, 1, 0.5f); // 辉光颜色
+
+    // 动画平滑变量
+    static float animWidth = 0, animHeight = 0;
+    static float animPosX = 0, animPosY = 0;
+    static float animAlpha = 0;
+    static float animSpeed = 10.0f; // 动画速度
 
     while (true) {
         if (this->isDestroy) { ThreadIo = false; cond.notify_all(); return; }
         if (this->isChage) { glViewport(0, 0, this->surfaceWidth, this->surfaceHigh); this->isChage = false; }
-        this->clearBuffers(); if (!ActivityState) { usleep(16000); continue; }
+        this->clearBuffers();
+        if (!ActivityState) { usleep(16000); continue; }
         
         imguiMainWinStart();
+        
+        // 1. 鲁棒性检查，防止闪退
+        if (input == nullptr || io == nullptr) { 
+            ImGui::EndFrame(); 
+            usleep(16000); 
+            continue; 
+        }
+        input->initImguiIo(io); 
+        input->setImguiContext(g);
 
-        // ==========================================
-        // 1. 外部控制菜单
-        // ==========================================
-        // 创建一个普通的 ImGui 窗口用于调节参数
-        ImGui::Begin("Rectangle Controller", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-        ImGui::Text("Adjust the properties below:");
-        ImGui::Separator();
+        float dt = io->DeltaTime;
+
+        // 2. 线性过渡动画计算 (Lerp)
+        animWidth  += (targetWidth - animWidth)   * animSpeed * dt;
+        animHeight += (targetHeight - animHeight) * animSpeed * dt;
+        animPosX   += (targetPosX - animPosX)     * animSpeed * dt;
+        animPosY   += (targetPosY - animPosY)     * animSpeed * dt;
+        animAlpha  += (targetAlpha - animAlpha)   * animSpeed * dt;
+
+        // 3. 调节菜单 (控制台)
+        ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
+        ImGui::Begin("UI控制器");
+        ImGui::Text("矩形设置");
+        ImGui::SliderFloat("宽度", &targetWidth, 100, 1000);
+        ImGui::SliderFloat("高度", &targetHeight, 100, 1000);
+        ImGui::SliderFloat("位置X", &targetPosX, 0, surfaceWidth);
+        ImGui::SliderFloat("位置Y", &targetPosY, 0, surfaceHigh);
+        ImGui::SliderFloat("透明度", &targetAlpha, 0, 1.0f);
+        ImGui::SliderFloat("圆角", &targetRounding, 0, 100);
+        ImGui::SliderFloat("动画速度", &animSpeed, 1, 30);
         
-        ImGui::SliderFloat("Width", &rectWidth, 50.0f, 1500.0f, "%.1f");
-        ImGui::SliderFloat("Height", &rectHeight, 50.0f, 1000.0f, "%.1f");
-        ImGui::SliderFloat("Alpha", &rectAlpha, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Rounding", &rectRounding, 0.0f, 150.0f, "%.1f");
-        
         ImGui::Separator();
-        ImGui::Text("Shadow Settings:");
-        ImGui::SliderFloat("Shadow Size", &shadowSize, 0.0f, 100.0f, "%.1f");
-        ImGui::SliderFloat("Shadow Alpha", &shadowAlpha, 0.0f, 1.0f, "%.2f");
+        ImGui::Text("文本 Melt 设置");
+        ImGui::SliderFloat("文本大小", &textScale, 0.5f, 3.0f);
+        ImGui::SliderFloat("文本偏移X", &textOffsetX, -100, 200);
+        ImGui::SliderFloat("文本偏移Y", &textOffsetY, -100, 200);
+        ImGui::SliderFloat("辉光强度", &textGlowIntensity, 0, 20);
+        ImGui::ColorEdit4("辉光颜色", (float*)&textGlowColor);
         ImGui::End();
 
-        // ==========================================
-        // 2. 黑色矩形与阴影绘制层
-        // ==========================================
-        // 计算包含阴影的整体窗口大小
-        float totalWindowWidth = rectWidth + shadowSize * 2.0f;
-        float totalWindowHeight = rectHeight + shadowSize * 2.0f;
-
-        // 设置窗口首次出现在屏幕正中央
-        ImGui::SetNextWindowPos(ImVec2((this->surfaceWidth - totalWindowWidth) / 2.0f, 
-                                       (this->surfaceHigh - totalWindowHeight) / 2.0f), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(totalWindowWidth, totalWindowHeight), ImGuiCond_Always);
-        
-        // 移除背景色和边框，使其完全透明，只作为我们绘制的“画布”
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
-        
-        // 创建无边框画布窗口 (保留移动功能，方便你在屏幕上拖拽)
-        ImGui::Begin("Custom Black Rectangle", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings);
+        // 4. 动画矩形绘制
+        // 使用一个全屏覆盖层作为画布，防止窗口标题栏干扰，这也是解决“一摸就闪退”的有效方法
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(surfaceWidth, surfaceHigh));
+        ImGui::Begin("Canvas", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings);
         
         ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImVec2 windowPos = ImGui::GetWindowPos();
         
-        // 居中计算内部实际矩形的坐标 (给阴影留出空间)
-        ImVec2 rectMin = ImVec2(windowPos.x + shadowSize, windowPos.y + shadowSize);
-        ImVec2 rectMax = ImVec2(rectMin.x + rectWidth, rectMin.y + rectHeight);
+        // 矩形绝对坐标
+        ImVec2 rectMin = ImVec2(animPosX, animPosY);
+        ImVec2 rectMax = ImVec2(animPosX + animWidth, animPosY + animHeight);
 
-        // --- A. 绘制阴影 ---
-        // 我们通过多次绘制边缘透明度递减的圆角矩形来实现平滑阴影效果
-        if (shadowSize > 0.0f && shadowAlpha > 0.0f) {
-            int steps = 30; // 阴影分层数量，越多越平滑
-            float strokeThickness = (shadowSize / steps) * 1.5f; // 保证层与层之间相互覆盖不留缝隙
-            
-            for (int i = 1; i <= steps; i++) {
-                float t = (float)i / steps; 
-                // 使用二次方曲线让阴影衰减更自然
-                float alpha = shadowAlpha * (1.0f - t) * (1.0f - t); 
-                float expand = t * shadowSize;
-                
-                drawList->AddRect(
-                    ImVec2(rectMin.x - expand, rectMin.y - expand), 
-                    ImVec2(rectMax.x + expand, rectMax.y + expand), 
-                    IM_COL32(0, 0, 0, (int)(alpha * 255.0f)), 
-                    rectRounding + expand,  // 圆角跟随阴影扩大
-                    0, strokeThickness
-                );
-            }
+        // A. 绘制背景阴影
+        for (int i = 1; i <= 10; i++) {
+            float shadowAlpha = (1.0f - (i / 10.0f)) * 0.2f * animAlpha;
+            drawList->AddRect(
+                ImVec2(rectMin.x - i * 2, rectMin.y - i * 2),
+                ImVec2(rectMax.x + i * 2, rectMax.y + i * 2),
+                IM_COL32(0, 0, 0, (int)(shadowAlpha * 255)),
+                targetRounding + i * 2, 0, 2.0f
+            );
         }
 
-        // --- B. 绘制主体黑色矩形 ---
-        drawList->AddRectFilled(
-            rectMin, 
-            rectMax, 
-            IM_COL32(0, 0, 0, (int)(rectAlpha * 255.0f)), // 黑色，应用调节的透明度
-            rectRounding
-        );
+        // B. 绘制黑色主矩形
+        drawList->AddRectFilled(rectMin, rectMax, IM_COL32(0, 0, 0, (int)(animAlpha * 255)), targetRounding);
+
+        // C. 绘制文本 "Melt" (位置跟随矩形动画)
+        ImVec2 textPos = ImVec2(rectMin.x + textOffsetX, rectMin.y + textOffsetY);
+        float fontSize = 32.0f * textScale;
+        
+        // 绘制文本辉光 (通过多层叠加)
+        if (textGlowIntensity > 0.1f) {
+            for (int i = 1; i <= 3; i++) {
+                float glowAlpha = (1.0f - (i / 3.0f)) * textGlowColor.w * animAlpha;
+                ImU32 gCol = ImGui::ColorConvertFloat4ToU32(ImVec4(textGlowColor.x, textGlowColor.y, textGlowColor.z, glowAlpha));
+                float offset = (i * textGlowIntensity) / 3.0f;
+                // 四周偏移绘制模拟模糊
+                drawList->AddText(imFont, fontSize, ImVec2(textPos.x + offset, textPos.y), gCol, "Melt");
+                drawList->AddText(imFont, fontSize, ImVec2(textPos.x - offset, textPos.y), gCol, "Melt");
+                drawList->AddText(imFont, fontSize, ImVec2(textPos.x, textPos.y + offset), gCol, "Melt");
+                drawList->AddText(imFont, fontSize, ImVec2(textPos.x, textPos.y - offset), gCol, "Melt");
+            }
+        }
+        
+        // 绘制主文本
+        drawList->AddText(imFont, fontSize, textPos, IM_COL32(255, 255, 255, (int)(animAlpha * 255)), "Melt");
 
         ImGui::End();
-        
-        // 恢复样式
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar(2);
 
         imguiMainWinEnd();
         if (mEglDisplay != EGL_NO_DISPLAY && mEglSurface != EGL_NO_SURFACE) { this->swapBuffers(); }
-        if (input != nullptr) { input->fps = ImGui::GetIO().Framerate; } usleep(16000); 
+        usleep(16000); 
     }
 }
 
+// ---------------------------------------------------------
+// 其余辅助函数保持不变
+// ---------------------------------------------------------
+
 int EGL::swapBuffers() {
-    if (eglSwapBuffers(mEglDisplay, mEglSurface)) {
-        return 1;
-    }
-    return 0;
+    return eglSwapBuffers(mEglDisplay, mEglSurface) ? 1 : 0;
 }
 
 void EGL::clearBuffers() {
@@ -249,10 +240,5 @@ void EGL::imguiMainWinEnd() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-void EGL::setSaveSettingsdir(std::string &dir) {
-    this->SaveDir = dir;
-}
-
-void EGL::setinput(ImguiAndroidInput *input_) {
-    this->input = input_;
-}
+void EGL::setSaveSettingsdir(std::string &dir) { this->SaveDir = dir; }
+void EGL::setinput(ImguiAndroidInput *input_) { this->input = input_; }
