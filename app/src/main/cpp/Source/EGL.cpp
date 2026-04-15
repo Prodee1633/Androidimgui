@@ -86,7 +86,7 @@ void EGL::onSurfaceChange(int SurfaceWidth, int SurfaceHigh) {
 
 void EGL::onSurfaceDestroy() {
     this->isDestroy = true;
-    std::uniquelock<std::mutex> ulo(Threadlk);
+    std::unique_lock<std::mutex> ulo(Threadlk);
     cond.wait(ulo, [this] { return !this->ThreadIo; });
     delete SurfaceThread;
     SurfaceThread = nullptr;
@@ -493,8 +493,8 @@ void EGL::EglThread() {
                 bool isZh = currentLang == 0;
                 bool isEn = currentLang == 1;
                 
-                CustomToggle("🇨🇳 中文", "🇨🇳 Chinese", &isZh, w);
-                CustomToggle("🇺🇸 英文", "🇺🇸 English", &isEn, w);
+                CustomToggle("中文", "Chinese", &isZh, w);
+                CustomToggle("英文", "English", &isEn, w);
                 
                 if (isZh && currentLang != 0) currentLang = 0;
                 if (isEn && currentLang != 1) currentLang = 1;
@@ -545,4 +545,3 @@ void EGL::imguiMainWinEnd() {
 
 void EGL::setSaveSettingsdir(std::string &dir) { this->SaveDir = dir; }
 void EGL::setinput(ImguiAndroidInput *input_) { this->input = input_; }
-}
