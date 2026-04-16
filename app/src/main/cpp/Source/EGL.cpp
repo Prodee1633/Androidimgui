@@ -625,4 +625,3 @@ void EGL::imguiMainWinEnd() {
 
 void EGL::setSaveSettingsdir(std::string &dir) { this->SaveDir = dir; }
 void EGL::setinput(ImguiAndroidInput *input_) { this->input = input_; }
-}
