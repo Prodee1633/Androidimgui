@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <functional>
 
-// 全局变量控制菜单的呼出状态
 bool ActivityState = true; 
 
 EGL::EGL() {
@@ -96,11 +95,9 @@ struct ModState {
 
     bool isEnabled = false;
     float enableAnim = 0.0f; 
-    float holdTime = 0.0f;
     bool isExpanded = false;
     float currentHeight = 100.0f;
     float targetHeight = 100.0f;
-    ImVec2 clickStartPos; 
     
     int keybind = ImGuiKey_None;
     bool floatShortcut = false;
@@ -108,6 +105,7 @@ struct ModState {
     float floatX = -1.0f, floatY = -1.0f;
     bool isDraggingFloat = false;
     ImVec2 floatDragOffset;
+    float floatClickTimer = 0.0f;
 
     ModState(std::string n, std::string d, int t, bool sOnly = false) 
         : name(n), desc(d), tabIndex(t), isSettingOnly(sOnly) {}
@@ -147,16 +145,23 @@ void EGL::EglThread() {
     static bool hasInitializedPos = false;
     static char searchBuffer[128] = "";
 
+    // 悬浮窗自定义参数与过渡
     static float floatWinSize = 1.0f;
     static float floatWinBgAlpha = 0.5f;
     static float floatWinActiveFontAlpha = 1.0f;
     static float floatWinInactiveFontAlpha = 0.5f;
+    static float floatTargetW = 120.0f, floatTargetH = 50.0f;
+    static float floatAnimW = 120.0f, floatAnimH = 50.0f;
 
+    // FPS自定义参数与过渡
     static float fpsPosX = 50.0f, fpsPosY = 50.0f;
     static int fpsAnchor = 0; 
     static float fpsBgAlpha = 0.5f;
+    static float fpsTargetW = 100.0f, fpsTargetH = 50.0f;
+    static float fpsAnimW = 100.0f, fpsAnimH = 50.0f;
     static int fpsValue = 0;
     static float fpsTimer = 0.0f;
+    static int fpsMode = 0;
 
     static std::vector<ModState> modules;
     static bool modsInitialized = false;
@@ -183,7 +188,11 @@ void EGL::EglThread() {
             fpsTimer -= 1.0f;
         }
 
-        // 处理通过物理按键呼出菜单
+        floatAnimW += (floatTargetW - floatAnimW) * animSpeed * dt;
+        floatAnimH += (floatTargetH - floatAnimH) * animSpeed * dt;
+        fpsAnimW += (fpsTargetW - fpsAnimW) * animSpeed * dt;
+        fpsAnimH += (fpsTargetH - fpsAnimH) * animSpeed * dt;
+
         auto menuMod = std::find_if(modules.begin(), modules.end(), [](const ModState& m){ return m.name == "菜单"; });
         if (menuMod != modules.end() && waitingKeybindMod == nullptr) {
             if (menuMod->keybind != ImGuiKey_None && ImGui::IsKeyPressed((ImGuiKey)menuMod->keybind, false)) {
@@ -204,8 +213,10 @@ void EGL::EglThread() {
         auto fpsModIt = std::find_if(modules.begin(), modules.end(), [](const ModState& m){ return m.name == "帧率显示"; });
         if (fpsModIt != modules.end() && fpsModIt->isEnabled) {
             char fpsBuf[32];
-            snprintf(fpsBuf, sizeof(fpsBuf), "%d", fpsValue);
-            ImVec2 baseBoxSize = ImVec2(100.0f, 50.0f);
+            if (fpsMode == 0) snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %d", fpsValue);
+            else snprintf(fpsBuf, sizeof(fpsBuf), "%d", fpsValue);
+            
+            ImVec2 baseBoxSize = ImVec2(fpsAnimW, fpsAnimH);
             ImVec2 textSize = ImGui::CalcTextSize(fpsBuf);
             ImVec2 actualPos = ImVec2(fpsPosX, fpsPosY);
             
@@ -228,23 +239,23 @@ void EGL::EglThread() {
             if (!mod.floatShortcut || mod.isSettingOnly) continue;
             if (mod.floatX == -1.0f) { mod.floatX = 200.0f; mod.floatY = 200.0f; }
 
-            ImVec2 fSize(120.0f * floatWinSize, 50.0f * floatWinSize);
+            ImVec2 fSize(floatAnimW * floatWinSize, floatAnimH * floatWinSize);
             ImRect fRect(mod.floatX, mod.floatY, mod.floatX + fSize.x, mod.floatY + fSize.y);
             
             bool fHovered = fRect.Contains(io->MousePos);
             if (fHovered && ImGui::IsMouseClicked(0)) {
                 mod.isDraggingFloat = true;
                 mod.floatDragOffset = ImVec2(mod.floatX - io->MousePos.x, mod.floatY - io->MousePos.y);
-                mod.holdTime = 0.0f; 
+                mod.floatClickTimer = 0.0f; 
             }
             
             if (mod.isDraggingFloat) {
                 if (ImGui::IsMouseDown(0)) {
                     mod.floatX = io->MousePos.x + mod.floatDragOffset.x;
                     mod.floatY = io->MousePos.y + mod.floatDragOffset.y;
-                    mod.holdTime += dt;
+                    mod.floatClickTimer += dt;
                 } else {
-                    if (mod.holdTime < 0.2f && fHovered) {
+                    if (mod.floatClickTimer < 0.2f && fHovered) {
                         mod.isEnabled = !mod.isEnabled;
                         if (mod.name == "菜单") ActivityState = mod.isEnabled;
                     }
@@ -382,28 +393,26 @@ void EGL::EglThread() {
 
         auto CustomToggle = [&](const char* label, bool* v) {
             ImVec2 textSize = ImGui::CalcTextSize(label);
-            textSize.x *= (24.0f * globalScale) / 32.0f; // Scale font base size
-            float cWidth = textSize.x + 35.0f * globalScale; 
+            textSize.x *= (24.0f * globalScale) / 32.0f; 
+            float cWidth = textSize.x + 40.0f * globalScale; 
             float cHeight = 40.0f * globalScale;
             ImVec2 pos = ImGui::GetCursorScreenPos();
             
             ImGui::InvisibleButton(label, ImVec2(cWidth, cHeight));
             if (ImGui::IsItemClicked() && ImGui::GetMouseDragDelta(0).y < 10.0f) *v = !*v;
             
-            ImU32 tCol = *v ? IM_COL32(30, 100, 200, (int)(255 * animAlpha)) : IM_COL32(255,255,255, (int)(255 * animAlpha));
-            drawList->AddText(imFont, 24.0f * globalScale, ImVec2(pos.x, pos.y + 8.0f * globalScale), tCol, label);
+            drawList->AddText(imFont, 24.0f * globalScale, ImVec2(pos.x, pos.y + 8.0f * globalScale), IM_COL32(255,255,255, (int)(255 * animAlpha)), label);
             
             ImGuiID id = ImGui::GetID(label);
             float animT = ImGui::GetStateStorage()->GetFloat(id, *v ? 1.0f : 0.0f);
             animT += ((*v ? 1.0f : 0.0f) - animT) * animSpeed * dt;
             ImGui::GetStateStorage()->SetFloat(id, animT);
             
-            ImVec2 bgMin = ImVec2(pos.x + textSize.x + 10.0f * globalScale, pos.y + 14.0f * globalScale);
-            ImVec2 bgMax = ImVec2(bgMin.x + 25.0f * globalScale, pos.y + 26.0f * globalScale);
-            drawList->AddRectFilled(bgMin, bgMax, ImGui::ColorConvertFloat4ToU32(ImVec4(mainBgColor.x, mainBgColor.y, mainBgColor.z, mainBgColor.w * animAlpha)), 6.0f * globalScale);
-            
-            float circleX = bgMin.x + 6.0f * globalScale + (bgMax.x - bgMin.x - 12.0f * globalScale) * animT;
-            drawList->AddCircleFilled(ImVec2(circleX, (bgMin.y + bgMax.y) * 0.5f), 5.0f * globalScale, IM_COL32(30, 100, 200, (int)(255 * animAlpha)));
+            ImVec2 dotCenter = ImVec2(pos.x + textSize.x + 20.0f * globalScale, pos.y + cHeight * 0.5f + 4.0f * globalScale);
+            drawList->AddCircleFilled(dotCenter, 8.0f * globalScale, ImGui::ColorConvertFloat4ToU32(ImVec4(mainBgColor.x, mainBgColor.y, mainBgColor.z, mainBgColor.w * animAlpha)));
+            if (animT > 0.01f) {
+                drawList->AddCircleFilled(dotCenter, 5.0f * globalScale * animT, IM_COL32(30, 100, 200, (int)(255 * animAlpha)));
+            }
         };
 
         auto CustomCombo = [&](const char* label, int* current_item, const char* const items[], int items_count, float cWidth) {
@@ -449,30 +458,14 @@ void EGL::EglThread() {
             ImRect modRect(modX, renderY, modX + modW, renderY + 100.0f * globalScale); 
             bool hovered = modRect.Contains(io->MousePos);
             
-            if (hovered && ImGui::IsMouseClicked(0)) state.clickStartPos = io->MousePos;
-            if (hovered && ImGui::IsMouseClicked(1)) state.isExpanded = !state.isExpanded; 
-            
-            if (hovered && ImGui::IsMouseDown(0)) {
-                float dragDist = sqrt(pow(io->MousePos.x - state.clickStartPos.x, 2) + pow(io->MousePos.y - state.clickStartPos.y, 2));
-                if (dragDist <= 20.0f * globalScale) {
-                    state.holdTime += dt;
-                    if (state.holdTime >= 0.3f && !state.isExpanded) { 
-                        state.isExpanded = true; 
-                        state.holdTime = -999.0f; 
-                    }
+            if (hovered && ImGui::IsMouseReleased(0) && ImGui::GetMouseDragDelta(0).x < 5.0f && ImGui::GetMouseDragDelta(0).y < 5.0f) {
+                float titleClickWidth = ImGui::CalcTextSize(state.name.c_str()).x * (35.0f * globalScale / 32.0f) + 40.0f * globalScale;
+                if (io->MousePos.x <= modX + titleClickWidth && !state.isSettingOnly) {
+                    state.isEnabled = !state.isEnabled;
+                    if (state.name == "菜单") ActivityState = state.isEnabled;
+                } else {
+                    state.isExpanded = !state.isExpanded;
                 }
-            } else {
-                if (hovered && ImGui::IsMouseReleased(0)) {
-                    float dragDist = sqrt(pow(io->MousePos.x - state.clickStartPos.x, 2) + pow(io->MousePos.y - state.clickStartPos.y, 2));
-                    if (dragDist <= 20.0f * globalScale && state.holdTime >= 0.0f && state.holdTime < 0.3f) {
-                        if (state.isExpanded) state.isExpanded = false;
-                        else if (!state.isSettingOnly) {
-                            state.isEnabled = !state.isEnabled;
-                            if (state.name == "菜单") ActivityState = state.isEnabled;
-                        }
-                    }
-                }
-                state.holdTime = 0.0f;
             }
             
             drawList->AddRectFilled(ImVec2(modX, renderY), ImVec2(modX + modW, renderY + state.currentHeight * globalScale), ImGui::ColorConvertFloat4ToU32(ImVec4(moduleBgColor.x, moduleBgColor.y, moduleBgColor.z, moduleBgColor.w * animAlpha)), scaledRounding);
@@ -529,9 +522,9 @@ void EGL::EglThread() {
             };
             ImGui::SetCursorScreenPos(ImVec2(rectMin.x + scaledListW + scaledPadding, contentY + scrollY));
             ImGui::BeginGroup();
-            if (CustomBtn("保存配置")) { /* Save Implement */ }
-            if (CustomBtn("加载配置")) { /* Load Implement */ }
-            if (CustomBtn("保存到剪贴板")) { /* Clip Implement */ }
+            if (CustomBtn("保存配置")) { }
+            if (CustomBtn("加载配置")) { }
+            if (CustomBtn("保存到剪贴板")) { }
             ImGui::EndGroup();
             contentY += ImGui::GetItemRectSize().y + 20.0f * globalScale;
         }
@@ -553,12 +546,18 @@ void EGL::EglThread() {
                     bool resetTrigger = false;
                     CustomToggle("悬浮窗位置重置", &resetTrigger);
                     if (resetTrigger) { for(auto& m : modules) { m.floatX = -1.0f; m.floatY = -1.0f; } }
-                    CustomSliderFloat("尺寸大小", &floatWinSize, 0.5f, 3.0f, w, "%.2f");
+                    CustomSliderFloat("背景宽度", &floatTargetW, 50.0f, 400.0f, w, "%.0f");
+                    CustomSliderFloat("背景高度", &floatTargetH, 30.0f, 200.0f, w, "%.0f");
+                    CustomSliderFloat("尺寸倍率", &floatWinSize, 0.5f, 3.0f, w, "%.2f");
                     CustomSliderFloat("背景透明度", &floatWinBgAlpha, 0.0f, 1.0f, w, "%.2f");
                     CustomSliderFloat("开启时字体透明度", &floatWinActiveFontAlpha, 0.0f, 1.0f, w, "%.2f");
                     CustomSliderFloat("关闭时字体透明度", &floatWinInactiveFontAlpha, 0.0f, 1.0f, w, "%.2f");
                 }
                 else if (mod.name == "帧率显示") {
+                    const char* modes[] = { "文本+数字", "仅数字" };
+                    CustomCombo("显示模式", &fpsMode, modes, 2, w);
+                    CustomSliderFloat("背景宽度", &fpsTargetW, 50.0f, 400.0f, w, "%.0f");
+                    CustomSliderFloat("背景高度", &fpsTargetH, 30.0f, 200.0f, w, "%.0f");
                     CustomSliderFloat("X轴", &fpsPosX, 0.0f, (float)surfaceWidth, w, "%.0f");
                     CustomSliderFloat("Y轴", &fpsPosY, 0.0f, (float)surfaceHigh, w, "%.0f");
                     const char* anchors[] = { "左上", "右上", "左下", "右下" };
